@@ -1,0 +1,64 @@
+﻿@page "/chart"
+@using Radzen.Blazor
+
+<div class="container">
+    <div class="row">
+        <div class="col-sm-12 my-5">
+            <RadzenChart ColorScheme="ColorScheme.Pastel" @ref="chart0">
+                <RadzenCategoryAxis Padding="20">
+                    <RadzenGridLines Visible="true" />
+                    <RadzenAxisTitle Text="Some measures" />
+                </RadzenCategoryAxis>
+                <RadzenLineSeries Data="@chartData" CategoryProperty="Measure" LineType="LineType.Solid" ValueProperty="Value" Title="@ChartNumber.ToString()">
+                    <RadzenMarkers MarkerType="MarkerType.Auto" />
+                </RadzenLineSeries>
+                <RadzenValueAxis>
+                    <RadzenGridLines Visible="true" />
+                    <RadzenAxisTitle Text="Some values" />
+                </RadzenValueAxis>
+            </RadzenChart>
+        </div>
+    </div>
+</div>
+
+@code {
+    // made using this code as basis https://forum.radzen.com/t/chart-not-updating/9337/5
+    [Parameter]
+    public int ChartNumber { get; set; } = 0;
+    
+    public List<ChartDataItem> chartData { get; set; } = new List<ChartDataItem>();
+
+    private int measureNumber { get; set; } = 0;
+    private RadzenChart chart0 { get; set; } = new RadzenChart();
+
+    protected override void OnInitialized() {
+        System.Timers.Timer timer = new System.Timers.Timer();
+        timer.Interval = 1000;
+        timer.Elapsed += OnTimedEvent;
+        timer.AutoReset = true;
+        timer.Enabled = true;
+    }
+
+    private void OnTimedEvent(object? sender, System.Timers.ElapsedEventArgs e) {
+        InvokeAsync(async () => {
+            chartData.Add(new ChartDataItem() { Measure = measureNumber, Value = someParameter });
+            if (chartData.Count > 100)
+                chartData.RemoveAt(0);
+            chartData = chartData.ToList();
+            ++measureNumber;
+            await chart0.Reload();
+        });
+    }
+
+    private double someParameter {
+        get {
+            return ChartNumber + ChartNumber * new Random().NextDouble() / 10;
+        }
+    }
+}
+@code {
+    public class ChartDataItem {
+        public int Measure { get; set; }
+        public double Value { get; set; }
+    }
+}

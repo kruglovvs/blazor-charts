@@ -1,3 +1,7 @@
 ﻿@page "/"
+@using TestProject.Components
 
-<h1>Hello, world!</h1>
+@for (int i = 1; i <= 16; ++i) 
+{
+    <Chart ChartNumber="@i"/>
+}
