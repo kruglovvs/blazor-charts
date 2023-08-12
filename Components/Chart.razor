@@ -1,37 +1,102 @@
 ﻿@page "/chart"
 @using Radzen.Blazor
+@using System.Collections.ObjectModel
+@inject ILogger<Chart> Logger
 
-<div class="container">
-    <div class="row">
-        <div class="col-sm-12 my-5">
-            <RadzenChart ColorScheme="ColorScheme.Pastel" @ref="chart0">
-                <RadzenCategoryAxis Padding="20">
-                    <RadzenGridLines Visible="true" />
-                    <RadzenAxisTitle Text="Some measures" />
-                </RadzenCategoryAxis>
-                <RadzenLineSeries Data="@chartData" CategoryProperty="Measure" LineType="LineType.Solid" ValueProperty="Value" Title="@ChartNumber.ToString()">
-                    <RadzenMarkers MarkerType="MarkerType.Auto" />
-                </RadzenLineSeries>
-                <RadzenValueAxis>
-                    <RadzenGridLines Visible="true" />
-                    <RadzenAxisTitle Text="Some values" />
-                </RadzenValueAxis>
-            </RadzenChart>
-        </div>
+
+<div class="col-sm-12 my-5">
+    <div class="rz-p-12 rz-text-align-center">
+        <RadzenChart ColorScheme="ColorScheme.Pastel" @ref="chart0">
+            <RadzenCategoryAxis Padding="20">
+                <RadzenGridLines Visible="true" />
+                <RadzenAxisTitle Text="Some measures" />
+            </RadzenCategoryAxis>
+            <RadzenLineSeries Data="@chartData" CategoryProperty="Measure" LineType="LineType.Solid" ValueProperty="Value" Title="@ChartNumber.ToString()">
+                <RadzenMarkers MarkerType="MarkerType.Auto" />
+            </RadzenLineSeries>
+            <RadzenValueAxis Formatter="format">
+                <RadzenGridLines Visible="true" />
+                <RadzenAxisTitle Text="Some values" />
+            </RadzenValueAxis>
+        </RadzenChart>
+    </div>
+    <div class="rz-p-12 rz-text-align-center">
+        <RadzenSlider Range="true" @bind-Value=@values @bind-Max="@measureNumber" TValue="IEnumerable<int>" />
     </div>
 </div>
 
+<Button Color="Color.Primary" Clicked="@(async () => await HandleRedraw())">Redraw</Button>
+
+<LineChart @ref="lineChart" TItem="double" />
+@code{
+    LineChart<double> lineChart;
+
+    protected override async Task OnAfterRenderAsync( bool firstRender )
+    {
+        if ( firstRender )
+        {
+            await HandleRedraw();
+        }
+    }
+
+    async Task HandleRedraw()
+    {
+        await lineChart.Clear();
+
+        await lineChart.AddLabelsDatasetsAndUpdate( Labels, GetLineChartDataset() );
+    }
+
+    LineChartDataset<double> GetLineChartDataset()
+    {
+        return new LineChartDataset<double>
+        {
+            Label = "# of randoms",
+            Data = RandomizeData(),
+            BackgroundColor = backgroundColors,
+            BorderColor = borderColors,
+            Fill = true,
+            PointRadius = 3,
+            CubicInterpolationMode = "monotone",
+        };
+    }
+
+    string[] Labels = { "Red", "Blue", "Yellow", "Green", "Purple", "Orange" };
+    List<string> backgroundColors = new List<string> { ChartColor.FromRgba( 255, 99, 132, 0.2f ), ChartColor.FromRgba( 54, 162, 235, 0.2f ), ChartColor.FromRgba( 255, 206, 86, 0.2f ), ChartColor.FromRgba( 75, 192, 192, 0.2f ), ChartColor.FromRgba( 153, 102, 255, 0.2f ), ChartColor.FromRgba( 255, 159, 64, 0.2f ) };
+    List<string> borderColors = new List<string> { ChartColor.FromRgba( 255, 99, 132, 1f ), ChartColor.FromRgba( 54, 162, 235, 1f ), ChartColor.FromRgba( 255, 206, 86, 1f ), ChartColor.FromRgba( 75, 192, 192, 1f ), ChartColor.FromRgba( 153, 102, 255, 1f ), ChartColor.FromRgba( 255, 159, 64, 1f ) };
+
+    List<double> RandomizeData()
+    {
+        var r = new Random( DateTime.Now.Millisecond );
+
+        return new List<double> { 
+            r.Next( 3, 50 ) * r.NextDouble(),
+            r.Next( 3, 50 ) * r.NextDouble(),
+            r.Next( 3, 50 ) * r.NextDouble(),
+            r.Next( 3, 50 ) * r.NextDouble(),
+            r.Next( 3, 50 ) * r.NextDouble(),
+            r.Next( 3, 50 ) * r.NextDouble() };
+    }
+}
+@code {
+    IEnumerable<int> values = new int[] { 14, 78 };
+}
+@code {
+    public string format(object e) {
+        return string.Format("{0:f2}", (double)e);
+    }
+}
 @code {
     // made using this code as basis https://forum.radzen.com/t/chart-not-updating/9337/5
     [Parameter]
     public int ChartNumber { get; set; } = 0;
-    
-    public List<ChartDataItem> chartData { get; set; } = new List<ChartDataItem>();
+
+    public ObservableCollection<ChartDataItem> chartData { get; set; } = new ObservableCollection<ChartDataItem>();
 
     private int measureNumber { get; set; } = 0;
     private RadzenChart chart0 { get; set; } = new RadzenChart();
 
     protected override void OnInitialized() {
+        Measure();
         System.Timers.Timer timer = new System.Timers.Timer();
         timer.Interval = 1000;
         timer.Elapsed += OnTimedEvent;
@@ -40,19 +105,25 @@
     }
 
     private void OnTimedEvent(object? sender, System.Timers.ElapsedEventArgs e) {
-        InvokeAsync(async () => {
-            chartData.Add(new ChartDataItem() { Measure = measureNumber, Value = someParameter });
-            if (chartData.Count > 100)
-                chartData.RemoveAt(0);
-            chartData = chartData.ToList();
-            ++measureNumber;
-            await chart0.Reload();
-        });
+        Measure();
+        Reload();
+    }
+
+    private void Reload() {
+        InvokeAsync(async () => { await chart0.Reload(); });
+    }
+    private void Measure() {
+        chartData.Add(new ChartDataItem() { Measure = measureNumber, Value = someParameter });
+        if (chartData.Count > 100)
+            chartData.RemoveAt(0);
+        ++measureNumber;
     }
 
     private double someParameter {
         get {
-            return ChartNumber + ChartNumber * new Random().NextDouble() / 10;
+            double value = ChartNumber + ChartNumber * new Random().NextDouble() / 10;
+            Logger.LogInformation($"chart №{ChartNumber} measured: {value}");
+            return value;
         }
     }
 }
